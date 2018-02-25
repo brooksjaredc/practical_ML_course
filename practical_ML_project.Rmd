@@ -2,7 +2,10 @@
 title: "Practical Machine Learning Course Project"
 author: "Jared Brooks"
 date: "2/24/2018"
-output: html_document
+output:
+  md_document: default
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -50,23 +53,23 @@ dim(training)
 
 ### Preprocessing (PCA)
 
-Here we see that the cleaning process has reduced the number of columns from 160 to only 58, which is still large. We can further reduce the number of features to use by performing a Principle Components Analysis. After some exploratory testing, we found that using the principle components that account for 75% of the variance is sufficient for this problem.
+Here we see that the cleaning process has reduced the number of columns from 160 to only 58, which is still large. We can further reduce the number of features to use by performing a Principle Components Analysis. After some exploratory testing, we found that using the principle components that account for 80% of the variance is sufficient for this problem.
 
 ```{r pca}
 suppressMessages(library(caret))
 train_num <- data.frame(sapply(training, function(x) as.numeric(x)))
 train_num$classe <- as.factor(train_num$classe)
-preObj <- preProcess(train_num[,-58], method = "pca", thresh=0.9)
+preObj <- preProcess(train_num[,-58], method = "pca", thresh=0.8)
 pca_training_preds <- predict(preObj, train_num[,-58])
 dim(training)
 dim(pca_training_preds)
 ```
 
-Here we see that only 11 principle components out of 57 (excluding the variable we are trying to predict) are necessary to account for 75% of the variance.
+Here we see that only 13 principle components out of 57 (excluding the variable we are trying to predict) are necessary to account for 80% of the variance.
 
 ### Model Selection
 
-We tried a number of different classification algorithms, including Naive Bayes and Support Vector Machines, but found that a Random Forest does the best job (Also, using train(...,method='rf') took significantly longer than randomForest(...), so that's the method we use). Below we show 3 crossfolds from random forest models using the top 11 principle components.
+We tried a number of different classification algorithms, including Naive Bayes and Support Vector Machines, but found that a Random Forest does the best job (Also, using train(...,method='rf') took significantly longer than randomForest(...), so that's the method we use). Below we show 3 crossfolds from random forest models using the top 11 principle components. And since we aren't using train(), we can't use it's built-in cross-validations routines.
 
 ### Cross Validation
 
@@ -74,31 +77,41 @@ We tried a number of different classification algorithms, including Naive Bayes 
 suppressMessages(library(caret))
 suppressMessages(library(randomForest))
 
-pca_training_preds$y <- training$classe
-
 set.seed(39592)
-fold1 <- createDataPartition(pca_training_preds$y, p=0.8, list = F)
-trainfold1 <- pca_training_preds[fold1,]
-testfold1 <- pca_training_preds[-fold1,]
-mod_rf_fold1 <- randomForest(y~.,data = trainfold1)
-pred_fold1 <- predict(mod_rf_fold1, testfold1)
-print(confusionMatrix(pred_fold1, testfold1$y)$overall[1])
+fold1 <- createDataPartition(training$classe, p=0.8, list = F)
+trainfold1 <- train_num[fold1,]
+testfold1 <- train_num[-fold1,]
+preObj1 <- preProcess(trainfold1[,-58], method = "pca", thresh=0.8)
+pca_training_preds1 <- predict(preObj1, trainfold1[,-58])
+pca_training_preds1$y <- trainfold1$classe
+pca_testing_preds1 <- predict(preObj1, testfold1[,-58])
+mod_rf_fold1 <- randomForest(y~.,data = pca_training_preds1)
+pred_fold1 <- predict(mod_rf_fold1, pca_testing_preds1)
+print(confusionMatrix(pred_fold1, testfold1$classe)$overall[1])
 
 set.seed(40639)
-fold2 <- createDataPartition(pca_training_preds$y, p=0.8, list = F)
-trainfold2 <- pca_training_preds[fold2,]
-testfold2 <- pca_training_preds[-fold2,]
-mod_rf_fold2 <- randomForest(y~.,data = trainfold2)
-pred_fold2 <- predict(mod_rf_fold2, testfold2)
-print(confusionMatrix(pred_fold2, testfold2$y)$overall[1])
+fold2 <- createDataPartition(training$classe, p=0.8, list = F)
+trainfold2 <- train_num[fold2,]
+testfold2 <- train_num[-fold2,]
+preObj2 <- preProcess(trainfold2[,-58], method = "pca", thresh=0.8)
+pca_training_preds2 <- predict(preObj2, trainfold2[,-58])
+pca_training_preds2$y <- trainfold2$classe
+pca_testing_preds2 <- predict(preObj2, testfold2[,-58])
+mod_rf_fold2 <- randomForest(y~.,data = pca_training_preds2)
+pred_fold2 <- predict(mod_rf_fold2, pca_testing_preds2)
+print(confusionMatrix(pred_fold2, testfold2$classe)$overall[1])
 
 set.seed(94823)
-fold3 <- createDataPartition(pca_training_preds$y, p=0.8, list = F)
-trainfold3 <- pca_training_preds[fold3,]
-testfold3 <- pca_training_preds[-fold3,]
-mod_rf_fold3 <- randomForest(y~.,data = trainfold3)
-pred_fold3 <- predict(mod_rf_fold3, testfold3)
-print(confusionMatrix(pred_fold3, testfold3$y)$overall[1])
+fold3 <- createDataPartition(training$classe, p=0.8, list = F)
+trainfold3 <- train_num[fold3,]
+testfold3 <- train_num[-fold3,]
+preObj3 <- preProcess(trainfold3[,-58], method = "pca", thresh=0.8)
+pca_training_preds3 <- predict(preObj3, trainfold3[,-58])
+pca_training_preds3$y <- trainfold3$classe
+pca_testing_preds3 <- predict(preObj3, testfold3[,-58])
+mod_rf_fold3 <- randomForest(y~.,data = pca_training_preds3)
+pred_fold3 <- predict(mod_rf_fold3, pca_testing_preds3)
+print(confusionMatrix(pred_fold3, testfold3$classe)$overall[1])
 ```
 
 ### Dependence on PCA Threshold
@@ -107,7 +120,7 @@ Here we plot the change in the number of PCs used and the error (1-accuracy) in 
 
 ```{r plot, echo=FALSE}
 library(ggplot2)
-
+pca_training_preds$y <- training$classe
 threshs <- seq(0.5, 0.95, by=0.025)
 pc_num <- c()
 acc <- c()
@@ -125,7 +138,6 @@ for (thresh in threshs){
   mod_rf_fold <- randomForest(y~.,data = trainfold)
   pred_plot <- predict(mod_rf_fold, testfold)
   
-  #print(confusionMatrix(pred_plot, testfold$y)$overall[[1]])
   acc <- append(acc, confusionMatrix(pred_plot, testfold$y)$overall[[1]])
   pc_num <- append(pc_num, dim(plot_preds)[2])
 }
@@ -134,7 +146,6 @@ acc <- unlist(acc)
 err <- 1-acc
 
 df <- data.frame(threshs=threshs,pc_num=pc_num,err=err)
-#qplot(threshs, pc_num)
 
 p <- ggplot(aes(x=threshs),data=df) + geom_line(aes(y = pc_num, colour = "Number of PCs"))
 p <- p + geom_line(aes(y=err*200, colour = "Error on Training"))
@@ -143,15 +154,12 @@ p <- p + scale_colour_manual(values = c("blue", "red"))
 p <- p + labs(y = "Number of PCs", x = "Thresholds", colour = "Legend")
 p <- p + theme(legend.position = c(0.8, 0.9))
 p
-
-#plot(pressure)
 ```
 
 ### Test Set Predictions
 
 ```{r test}
 test_num <- data.frame(sapply(testing, function(x) as.numeric(x)))
-#preObj.test <- preProcess(test_num, method = "pca", thresh=0.75)
 pca_testing_preds <- predict(preObj, test_num)
 
 pca_training_preds$y <- training$classe

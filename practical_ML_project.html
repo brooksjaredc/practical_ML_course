@@ -179,56 +179,66 @@ testing &lt;- testing[,-c(1,6)]</code></pre>
 </div>
 <div id="preprocessing-pca" class="section level3">
 <h3>Preprocessing (PCA)</h3>
-<p>Here we see that the cleaning process has reduced the number of columns from 160 to only 58, which is still large. We can further reduce the number of features to use by performing a Principle Components Analysis. After some exploratory testing, we found that using the principle components that account for 75% of the variance is sufficient for this problem.</p>
+<p>Here we see that the cleaning process has reduced the number of columns from 160 to only 58, which is still large. We can further reduce the number of features to use by performing a Principle Components Analysis. After some exploratory testing, we found that using the principle components that account for 80% of the variance is sufficient for this problem.</p>
 <pre class="r"><code>suppressMessages(library(caret))
 train_num &lt;- data.frame(sapply(training, function(x) as.numeric(x)))
 train_num$classe &lt;- as.factor(train_num$classe)
-preObj &lt;- preProcess(train_num[,-58], method = &quot;pca&quot;, thresh=0.9)
+preObj &lt;- preProcess(train_num[,-58], method = &quot;pca&quot;, thresh=0.8)
 pca_training_preds &lt;- predict(preObj, train_num[,-58])
 dim(training)</code></pre>
 <pre><code>## [1] 19622    58</code></pre>
 <pre class="r"><code>dim(pca_training_preds)</code></pre>
-<pre><code>## [1] 19622    20</code></pre>
-<p>Here we see that only 11 principle components out of 57 (excluding the variable we are trying to predict) are necessary to account for 75% of the variance.</p>
+<pre><code>## [1] 19622    13</code></pre>
+<p>Here we see that only 13 principle components out of 57 (excluding the variable we are trying to predict) are necessary to account for 80% of the variance.</p>
 </div>
 <div id="model-selection" class="section level3">
 <h3>Model Selection</h3>
-<p>We tried a number of different classification algorithms, including Naive Bayes and Support Vector Machines, but found that a Random Forest does the best job (Also, using train(…,method=‘rf’) took significantly longer than randomForest(…), so that’s the method we use). Below we show 3 crossfolds from random forest models using the top 11 principle components.</p>
+<p>We tried a number of different classification algorithms, including Naive Bayes and Support Vector Machines, but found that a Random Forest does the best job (Also, using train(…,method=‘rf’) took significantly longer than randomForest(…), so that’s the method we use). Below we show 3 crossfolds from random forest models using the top 11 principle components. And since we aren’t using train(), we can’t use it’s built-in cross-validations routines.</p>
 </div>
 <div id="cross-validation" class="section level3">
 <h3>Cross Validation</h3>
 <pre class="r"><code>suppressMessages(library(caret))
 suppressMessages(library(randomForest))
 
-pca_training_preds$y &lt;- training$classe
-
 set.seed(39592)
-fold1 &lt;- createDataPartition(pca_training_preds$y, p=0.8, list = F)
-trainfold1 &lt;- pca_training_preds[fold1,]
-testfold1 &lt;- pca_training_preds[-fold1,]
-mod_rf_fold1 &lt;- randomForest(y~.,data = trainfold1)
-pred_fold1 &lt;- predict(mod_rf_fold1, testfold1)
-print(confusionMatrix(pred_fold1, testfold1$y)$overall[1])</code></pre>
+fold1 &lt;- createDataPartition(training$classe, p=0.8, list = F)
+trainfold1 &lt;- train_num[fold1,]
+testfold1 &lt;- train_num[-fold1,]
+preObj1 &lt;- preProcess(trainfold1[,-58], method = &quot;pca&quot;, thresh=0.8)
+pca_training_preds1 &lt;- predict(preObj1, trainfold1[,-58])
+pca_training_preds1$y &lt;- trainfold1$classe
+pca_testing_preds1 &lt;- predict(preObj1, testfold1[,-58])
+mod_rf_fold1 &lt;- randomForest(y~.,data = pca_training_preds1)
+pred_fold1 &lt;- predict(mod_rf_fold1, pca_testing_preds1)
+print(confusionMatrix(pred_fold1, testfold1$classe)$overall[1])</code></pre>
 <pre><code>##  Accuracy 
-## 0.9816467</code></pre>
+## 0.9722151</code></pre>
 <pre class="r"><code>set.seed(40639)
-fold2 &lt;- createDataPartition(pca_training_preds$y, p=0.8, list = F)
-trainfold2 &lt;- pca_training_preds[fold2,]
-testfold2 &lt;- pca_training_preds[-fold2,]
-mod_rf_fold2 &lt;- randomForest(y~.,data = trainfold2)
-pred_fold2 &lt;- predict(mod_rf_fold2, testfold2)
-print(confusionMatrix(pred_fold2, testfold2$y)$overall[1])</code></pre>
+fold2 &lt;- createDataPartition(training$classe, p=0.8, list = F)
+trainfold2 &lt;- train_num[fold2,]
+testfold2 &lt;- train_num[-fold2,]
+preObj2 &lt;- preProcess(trainfold2[,-58], method = &quot;pca&quot;, thresh=0.8)
+pca_training_preds2 &lt;- predict(preObj2, trainfold2[,-58])
+pca_training_preds2$y &lt;- trainfold2$classe
+pca_testing_preds2 &lt;- predict(preObj2, testfold2[,-58])
+mod_rf_fold2 &lt;- randomForest(y~.,data = pca_training_preds2)
+pred_fold2 &lt;- predict(mod_rf_fold2, pca_testing_preds2)
+print(confusionMatrix(pred_fold2, testfold2$classe)$overall[1])</code></pre>
 <pre><code>##  Accuracy 
-## 0.9796074</code></pre>
+## 0.9696661</code></pre>
 <pre class="r"><code>set.seed(94823)
-fold3 &lt;- createDataPartition(pca_training_preds$y, p=0.8, list = F)
-trainfold3 &lt;- pca_training_preds[fold3,]
-testfold3 &lt;- pca_training_preds[-fold3,]
-mod_rf_fold3 &lt;- randomForest(y~.,data = trainfold3)
-pred_fold3 &lt;- predict(mod_rf_fold3, testfold3)
-print(confusionMatrix(pred_fold3, testfold3$y)$overall[1])</code></pre>
+fold3 &lt;- createDataPartition(training$classe, p=0.8, list = F)
+trainfold3 &lt;- train_num[fold3,]
+testfold3 &lt;- train_num[-fold3,]
+preObj3 &lt;- preProcess(trainfold3[,-58], method = &quot;pca&quot;, thresh=0.8)
+pca_training_preds3 &lt;- predict(preObj3, trainfold3[,-58])
+pca_training_preds3$y &lt;- trainfold3$classe
+pca_testing_preds3 &lt;- predict(preObj3, testfold3[,-58])
+mod_rf_fold3 &lt;- randomForest(y~.,data = pca_training_preds3)
+pred_fold3 &lt;- predict(mod_rf_fold3, pca_testing_preds3)
+print(confusionMatrix(pred_fold3, testfold3$classe)$overall[1])</code></pre>
 <pre><code>##  Accuracy 
-## 0.9790976</code></pre>
+## 0.9709406</code></pre>
 </div>
 <div id="dependence-on-pca-threshold" class="section level3">
 <h3>Dependence on PCA Threshold</h3>
@@ -238,7 +248,6 @@ print(confusionMatrix(pred_fold3, testfold3$y)$overall[1])</code></pre>
 <div id="test-set-predictions" class="section level3">
 <h3>Test Set Predictions</h3>
 <pre class="r"><code>test_num &lt;- data.frame(sapply(testing, function(x) as.numeric(x)))
-#preObj.test &lt;- preProcess(test_num, method = &quot;pca&quot;, thresh=0.75)
 pca_testing_preds &lt;- predict(preObj, test_num)
 
 pca_training_preds$y &lt;- training$classe
@@ -246,7 +255,7 @@ mod_rf_full &lt;- randomForest(y~.,data = pca_training_preds)
 pred &lt;- predict(mod_rf_full, pca_testing_preds)
 pred</code></pre>
 <pre><code>##  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 
-##  B  A  A  A  A  E  D  B  A  A  B  C  B  A  E  E  A  B  B  B 
+##  A  A  A  A  A  E  D  B  A  A  B  C  B  A  E  E  A  B  B  B 
 ## Levels: A B C D E</code></pre>
 <p>Since the model does well consistently on the cross-validation folds, and because we used PCA, I think the model will do quite well on unseen data, probably &gt;90% (out of sample error &lt;10%).</p>
 </div>
